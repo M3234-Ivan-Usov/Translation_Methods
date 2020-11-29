@@ -1,0 +1,37 @@
+
+str = "Hello, World"
+
+class TestClass:
+    def __init__(self, x=5.0, z=1):
+        self.x = x
+        self.z = z
+
+    def func(self, y=TestClass()):
+        for x in range (y.z):
+            self.x += sqrt(y.x)
+        return self.x
+
+    def bool_expr(self):
+        return self.z == 1
+
+    def another_bool(self, b=True):
+        return (self.z + 1) and b
+
+    def another_func(self):
+        return self.z ** (self.x / 2) * self.x
+
+def global_func(x=TestClass(), z=True):
+    return (x.bool_expr() or x.another_bool(z)) and not z
+
+test_base = TestClass(0.0, len(str))
+for x in range(10):
+    test_instance = TestClass(sqrt(x), x)
+    test_instance.func(test_base)
+    for c in str:
+        if test_instance.bool_expr(x) and c == 30:
+            print(test_instance.another_bool(), x, c)
+
+tr = test_base.another_func()
+while tr < 10 or tr < len(str):
+    tr += test_base.func(test_base)
+
