@@ -1,37 +1,44 @@
-
-str = "Hello, World"
+x = 0.0
+while True:
+    print(x, x ** 2)
+    x += x ** 2
+    if x >= 100:
+        break
 
 class TestClass:
-    def __init__(self, x=5.0, z=1):
+    def __init__(self, x : int, z = 0, str = "hello"):
         self.x = x
-        self.z = z
+        self.string = str
+        self.z = sqrt(z)
 
-    def func(self, y=TestClass()):
-        for x in range (y.z):
-            self.x += sqrt(y.x)
+    def func(self, y : TestClass):
+        for x in range (y.x):
+            self.x += sqrt(len(y.string))
         return self.x
 
-    def bool_expr(self):
-        return self.z == 1
+    def get_string(self):
+        return self.string
 
-    def another_bool(self, b=True):
-        return (self.z + 1) and b
+    def bool_expr(self):
+        return self.z < 5
+
+    def another_bool(self, mode = False):
+        if mode:
+            return self.x == 0 and self.z < 5
+        else:
+            return len(self.string) >= 6
 
     def another_func(self):
         return self.z ** (self.x / 2) * self.x
 
-def global_func(x=TestClass(), z=True):
+def global_func(x : TestClass, z=True):
     return (x.bool_expr() or x.another_bool(z)) and not z
 
-test_base = TestClass(0.0, len(str))
+test_base = TestClass(0, 5)
 for x in range(10):
-    test_instance = TestClass(sqrt(x), x)
+    test_instance = TestClass(len(test_base.string), x)
     test_instance.func(test_base)
-    for c in str:
-        if test_instance.bool_expr(x) and c == 30:
+    test_string = test_base.get_string()
+    for c in test_string:
+        if test_instance.bool_expr() and c == 30:
             print(test_instance.another_bool(), x, c)
-
-tr = test_base.another_func()
-while tr < 10 or tr < len(str):
-    tr += test_base.func(test_base)
-

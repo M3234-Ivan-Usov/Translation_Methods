@@ -1,5 +1,6 @@
 package ru.ifmo.rain.usov.antlr;
 
+import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import ru.ifmo.rain.usov.antlr.grammar.PythonBaseListener;
 import ru.ifmo.rain.usov.antlr.grammar.PythonParser;
@@ -10,13 +11,12 @@ import java.util.regex.Pattern;
 
 /**
  * Translates Python source into C++.
- * Supports only key-arguments in function signatures.
+ * Supports only key-arguments and explicitly typed arguments in function signatures.
  * New classes and objects should appear in strict order.
  * Supports int, float, bool and string types.
  * Supports range-based cycles and inlines arithmetic cycles aka in range().
  * Inlines Python's print(obj1, obj2, ...).
  * Supports classes without nested classes and static data.
- * Sometimes may confuse float and int
  */
 public class PythonTranslator extends PythonBaseListener {
     protected static final String GLOBAL = "def";
@@ -35,8 +35,10 @@ public class PythonTranslator extends PythonBaseListener {
 
     private String currentType = null;
     private String margin = "";
+
     private Stack<Boolean> inlineBuiltIn = new Stack<>();
     private Stack<Integer> statementStart = new Stack<>();
+    private Stack<Map<String, String>> scopeInstances = new Stack<>();
     private Stack<PythonFunction> functionToCall = new Stack<>();
 
     /**
@@ -91,7 +93,7 @@ public class PythonTranslator extends PythonBaseListener {
         globalFunction.args.add(new Argument("argc", "int"));
         globalFunction.args.add(new Argument("argv", "char**"));
         PythonClass string = new PythonClass("std::string");
-        string.rangeBasedType = "char";
+        string.containerElementsType = "char";
         classes.put("std::string", string);
         PythonFunction len = new PythonFunction("len", null, "int ");
         len.args.add(new Argument("object", "int"));
@@ -129,6 +131,67 @@ public class PythonTranslator extends PythonBaseListener {
         cppSource.append(matcher.replaceAll(System.lineSeparator() + INDENT));
         cppSource.append(System.lineSeparator()).append("}");
         return cppSource.toString();
+    }
+
+    /**
+     * Prevents converting floating rvalue to integral
+     * @param type Does some case if only equals "int"
+     * @return Float in case input int and expression type is floating
+     */
+    private String checkFloatToInt(String type) {
+        type = type.trim();
+        if (currentType != null && currentType.equals("float") && type.equals("int")) {
+            return "float";
+        }
+        return type;
+    }
+
+    /**
+     * Adds new instance into current scope
+     * @param name Instance name
+     * @param type Instance type
+     */
+    private void pushNewInstance(String name, String type) {
+        try {
+            if (PRIMITIVE_TYPES.contains(type)) {
+                currentFunction.primitives.put(name, type);
+            } else {
+                currentFunction.references.put(name, classes.get(type));
+            }
+        } catch (NullPointerException e) {
+            throw new IllegalArgumentException("Unknown type: " + type);
+        }
+        if (scopeInstances.size() > 0) {
+            scopeInstances.peek().put(name, type);
+        }
+    }
+
+    /**
+     * Clear stack instances when exit current scope
+     */
+    private void destroyVariables() {
+        Map<String, String> cycleVariables = scopeInstances.pop();
+        for(Map.Entry<String, String> variable : cycleVariables.entrySet())
+            if (PRIMITIVE_TYPES.contains(variable.getValue())) {
+                currentFunction.primitives.remove(variable.getKey(), variable.getValue());
+            } else {
+                currentFunction.references.remove(variable.getKey(), classes.get(variable.getValue()));
+            }
+    }
+
+    /**
+     * Splits complex name into class and instance name
+     * @param fullName Complex name with or without point
+     * @return Key = "" or class-object name if any, Value = instance name
+     */
+    private Map.Entry<String, String> resolveName(String fullName) {
+        if (fullName.contains(".")) {
+            int point = fullName.indexOf(".");
+            String clazz = fullName.substring(0, point);
+            String method = fullName.substring(point + 1);
+            return Map.entry(clazz, method);
+        }
+        return Map.entry("", fullName);
     }
 
     @Override
@@ -180,6 +243,14 @@ public class PythonTranslator extends PythonBaseListener {
     }
 
     @Override
+    public void enterTyped_arg(PythonParser.Typed_argContext ctx) {
+        Argument arg = new Argument(ctx.NAME(0).getText(), ctx.NAME(1).getText());
+        pushNewInstance(arg.name, arg.type);
+        currentFunction.addArgument(arg);
+        super.enterTyped_arg(ctx);
+    }
+
+    @Override
     public void enterKey_arg(PythonParser.Key_argContext ctx) {
         identifyType = true;
         super.enterKey_arg(ctx);
@@ -193,17 +264,24 @@ public class PythonTranslator extends PythonBaseListener {
             String value = ctx.support_types().getText();
             value = KEY_DICT.getOrDefault(value, value);
             arg = new Argument(ctx.NAME().getText(), currentType, value);
-            currentFunction.localVariables.put(arg.name, arg.type);
+            currentFunction.primitives.put(arg.name, arg.type);
         } else {
-            String userType = ctx.func_call().complex_name().getText();
-            arg = new Argument(ctx.NAME().getText(), userType);
-            currentFunction.localObjects.put(arg.name, classes.get(userType));
+            String complexType = ctx.func_call().complex_name().getText();
+            try {
+                arg = new Argument(ctx.NAME().getText(), complexType);
+                currentFunction.references.put(arg.name, classes.get(complexType));
+            } catch (NullPointerException e) {
+                throw new IllegalArgumentException("Unknown type: " + complexType + " at line: " + ctx.getText());
+            }
         }
         currentType = null;
         currentFunction.addArgument(arg);
         super.exitKey_arg(ctx);
     }
 
+    /*
+    Since it will be parsed, do not use it! Dynamically type definition is not implemented
+     */
     @Override
     public void enterSimple_arg(PythonParser.Simple_argContext ctx) {
         currentFunction.addArgument(new Argument(ctx.NAME().getText()));
@@ -249,6 +327,9 @@ public class PythonTranslator extends PythonBaseListener {
         super.exitClazz(ctx);
     }
 
+    /*
+    Do not really work. Only prints, but do not really merge fields and methods
+     */
     @Override
     public void enterAncestors(PythonParser.AncestorsContext ctx) {
         for (TerminalNode ancestor : ctx.NAME()) {
@@ -263,18 +344,13 @@ public class PythonTranslator extends PythonBaseListener {
             functionToCall.push(functions.get(ctx.built_in().getText()));
         } else {
             inlineBuiltIn.push(false);
-            String fullName = ctx.complex_name().getText();
-            if (fullName.contains(".")) {
-                int point = fullName.indexOf(".");
-                String clazz = fullName.substring(0, point);
-                String method = fullName.substring(point + 1);
-                if (clazz.equals("self")) {
-                    clazz = currentClass.name;
-                }
-                functionToCall.push(classes.containsKey(clazz) ? classes.get(clazz).methods.get(method) :
-                        currentFunction.localObjects.get(clazz).methods.get(method));
-            } else {
-                functionToCall.push(functions.get(fullName));
+            Map.Entry<String, String> fullName = resolveName(ctx.complex_name().getText());
+            if (!fullName.getKey().equals("")) {
+                String clazz = fullName.getKey().equals("self")? currentClass.name : fullName.getKey();
+                functionToCall.push(currentFunction.references.get(clazz).methods.get(fullName.getValue()));
+            }
+            else {
+                functionToCall.push(functions.get(fullName.getValue()));
             }
         }
         statementStart.push(currentFunction.body.length());
@@ -290,11 +366,16 @@ public class PythonTranslator extends PythonBaseListener {
             currentFunction.body.delete(statementStart.peek(), currentFunction.body.length());
             switch (ctx.built_in().getText()) {
                 case "print":
-                    currentFunction.body.append("std::cout");
+                    currentFunction.body.append("std::cout << ");
+                    int innerFunctions = 0;
                     for (String param : params) {
-                        currentFunction.body.append(" << ").append(param);
+                        currentFunction.body.append(param);
+                        if (param.contains("(")) { innerFunctions++; }
+                        if (param.contains(")")) { innerFunctions--; }
+                        if (innerFunctions == 0) { currentFunction.body.append(" << "); }
+                        else { currentFunction.body.append(", "); }
                     }
-                    currentFunction.body.append(" << std::endl");
+                    currentFunction.body.append("std::endl");
                     break;
                 case "len":
                     currentFunction.body.append(params[0]).append(".size()");
@@ -306,8 +387,7 @@ public class PythonTranslator extends PythonBaseListener {
             currentType = functionToCall.pop().returnType;
             statementStart.pop();
         } catch (NullPointerException e) {
-            throw (new IllegalArgumentException("Unknown object in line:" +
-                    currentFunction.body.substring(statementStart.pop())));
+            throw new IllegalArgumentException("Unknown object at line:" + ctx.getText());
         }
         super.exitFunc_call(ctx);
     }
@@ -323,10 +403,7 @@ public class PythonTranslator extends PythonBaseListener {
     @Override
     public void exitRet(PythonParser.RetContext ctx) {
         if (identifyType && currentType != null) {
-            boolean float_to_int = currentFunction.returnType.equals("float ") && currentType.equals("int");
-            if (!float_to_int) {
-                currentFunction.returnType = currentType + " ";
-            }
+            currentFunction.returnType = currentType + " ";
             currentType = null;
             identifyType = false;
         }
@@ -335,9 +412,15 @@ public class PythonTranslator extends PythonBaseListener {
 
     @Override
     public void enterRange_based(PythonParser.Range_basedContext ctx) {
-        String source = ctx.complex_name().getText();
-        String type = currentFunction.localObjects.get(source).rangeBasedType;
-        currentFunction.body.append(" (").append(type).append(" & ");
+        try {
+            String source = ctx.complex_name().getText();
+            String type = currentFunction.references.get(source).containerElementsType;
+            scopeInstances.push(new HashMap<>());
+            pushNewInstance(ctx.NAME().getText(), type);
+            currentFunction.body.append(" (").append(type).append(" & ");
+        } catch (NullPointerException e) {
+            throw new IllegalArgumentException("Unknown object: " + ctx.complex_name().getText());
+        }
         super.enterRange_based(ctx);
     }
 
@@ -348,13 +431,19 @@ public class PythonTranslator extends PythonBaseListener {
     }
 
     @Override
+    public void exitFor_cycle(PythonParser.For_cycleContext ctx) {
+        destroyVariables();
+        super.exitFor_cycle(ctx);
+    }
+
+    @Override
     public void enterArithmetic_cycle(PythonParser.Arithmetic_cycleContext ctx) {
         print = false;
         List<PythonParser.Int_valueContext> range = ctx.int_value();
         String begin = "0";
         String end = range.get(0).getText();
         String step = "++";
-        String counter = ctx.NAME().getText();
+        String name = ctx.NAME().getText();
         if (range.size() > 2) {
             begin = range.get(0).getText();
             end = range.get(1).getText();
@@ -366,8 +455,11 @@ public class PythonTranslator extends PythonBaseListener {
                 step = "--";
             }
         }
-        currentFunction.body.append(" (int ").append(counter).append(" = ").append(begin).append("; ")
-                .append(counter).append(" < ").append(end).append("; ").append(counter).append(step);
+        scopeInstances.push(new HashMap<>());
+        Argument counter = new Argument(name, "int", begin);
+        pushNewInstance(counter.name, counter.type);
+        currentFunction.body.append(" (").append(counter).append("; ").append(counter.name)
+                .append(" < ").append(end).append("; ").append(counter.name).append(step);
         super.enterArithmetic_cycle(ctx);
     }
 
@@ -381,7 +473,7 @@ public class PythonTranslator extends PythonBaseListener {
     @Override
     public void enterAssignment(PythonParser.AssignmentContext ctx) {
         String name = ctx.lvalue().complex_name().getText();
-        boolean newVariable = !name.contains(".") && !currentFunction.localVariables.containsKey(name);
+        boolean newVariable = !name.contains(".") && !currentFunction.primitives.containsKey(name);
         boolean defineClassMember = inConstructor && name.startsWith("self.");
         if (newVariable) {
             statementStart.push(currentFunction.body.length());
@@ -399,16 +491,12 @@ public class PythonTranslator extends PythonBaseListener {
         if (currentType != null && identifyType) {
             String name = ctx.lvalue().complex_name().getText();
             boolean newInstance = !name.contains(".") &&
-                    !currentFunction.localVariables.containsKey(name) &&
-                    !currentFunction.localObjects.containsKey(name);
+                    !currentFunction.primitives.containsKey(name) &&
+                    !currentFunction.references.containsKey(name);
             boolean defineClassField = inConstructor && name.startsWith("self.");
             if (newInstance) {
                 currentType = currentType.trim();
-                if (PRIMITIVE_TYPES.contains(currentType)) {
-                    currentFunction.localVariables.put(name, currentType);
-                } else {
-                    currentFunction.localObjects.put(name, classes.get(currentType));
-                }
+                pushNewInstance(name, currentType);
                 currentFunction.body.insert(statementStart.pop(), currentType + " ");
             } else if (defineClassField) {
                 currentClass.fields.get(name.substring(5)).type = currentType;
@@ -445,10 +533,35 @@ public class PythonTranslator extends PythonBaseListener {
             int power = currentFunction.body.indexOf("**", statementStart.peek());
             String left = currentFunction.body.substring(statementStart.peek(), power);
             String right = currentFunction.body.substring(power + 2);
-            currentFunction.body.replace(statementStart.pop(), currentFunction.body.length(),
-                    "pow(" + left + ", " + right + ")");
+            currentFunction.body.replace(statementStart.pop(),
+                    currentFunction.body.length(), "pow(" + left + ", " + right + ")");
+            currentType = "float";
         }
         super.exitPower(ctx);
+    }
+
+    @Override
+    public void enterWhile_cycle(PythonParser.While_cycleContext ctx) {
+        scopeInstances.push(new HashMap<>());
+        super.enterWhile_cycle(ctx);
+    }
+
+    @Override
+    public void exitWhile_cycle(PythonParser.While_cycleContext ctx) {
+        destroyVariables();
+        super.exitWhile_cycle(ctx);
+    }
+
+    @Override
+    public void enterBranch(PythonParser.BranchContext ctx) {
+        scopeInstances.push(new HashMap<>());
+        super.enterBranch(ctx);
+    }
+
+    @Override
+    public void exitBranch(PythonParser.BranchContext ctx) {
+        destroyVariables();
+        super.exitBranch(ctx);
     }
 
     @Override
@@ -473,44 +586,32 @@ public class PythonTranslator extends PythonBaseListener {
             if (currentType != null && currentType.equals("bool")) {
                 return;
             }
-            if (ctx.func_call() != null) {
-                try {
+            try {
+                if (ctx.func_call() != null) {
                     if (ctx.func_call().built_in() != null) {
                         currentType = functions.get(ctx.func_call().built_in().getText()).returnType;
                         return;
                     }
-                    String name = ctx.func_call().complex_name().getText();
-                    if (name.contains(".")) {
-                        String clazz = name.substring(0, name.indexOf("."));
-                        String method = name.substring(name.indexOf(".") + 1);
-                        currentType = currentFunction.localObjects.get(clazz).methods.get(method).returnType;
-                    } else {
-                        currentType = functions.get(name).returnType;
-                    }
-                } catch (NullPointerException e) {
-                    throw new IllegalArgumentException("Unknown function: " + ctx.func_call().getText());
+                    Map.Entry<String, String> fullName = resolveName(ctx.func_call().complex_name().getText());
+                    currentType = fullName.getKey().equals("") ? functions.get(fullName.getValue()).returnType :
+                            currentFunction.references.get(fullName.getKey()).methods.get(fullName.getValue()).returnType;
                 }
-            }
-            if (ctx.complex_name() != null) {
-                try {
-                    String fullName = ctx.complex_name().getText();
-                    if (fullName.contains(".")) {
-                        String clazz = fullName.substring(0, fullName.indexOf("."));
-                        String field = fullName.substring(fullName.indexOf(".") + 1);
-                        currentType = (clazz.equals("self")) ?
-                                classes.get(currentClass.name).fields.get(field).type :
-                                currentFunction.localObjects.get(clazz).fields.get(field).type;
+                if (ctx.complex_name() != null) {
+                    Map.Entry<String, String> fullName = resolveName(ctx.complex_name().getText());
+                    if (!fullName.getKey().equals("")) {
+                        currentType = checkFloatToInt(fullName.getKey().equals("self") ?
+                                currentClass.fields.get(fullName.getValue()).type :
+                                currentFunction.references.get(fullName.getKey())
+                                        .fields.get(fullName.getValue()).type);
                     } else {
-                        if (currentClass != null) {
-                            currentType = classes.get(currentClass.name).methods
-                                    .get(currentFunction.name).localVariables.get(fullName);
-                        } else {
-                            currentType = currentFunction.localVariables.get(fullName);
-                        }
+                        currentType = checkFloatToInt((currentClass != null) ?
+                                checkFloatToInt(currentClass.methods.get(currentFunction.name)
+                                        .primitives.get(fullName.getValue())) :
+                                currentFunction.primitives.get(fullName.getValue()));
                     }
-                } catch (NullPointerException e) {
-                    throw new IllegalArgumentException("Cannot resolve: " + ctx.complex_name());
                 }
+            } catch (NullPointerException e) {
+                throw new IllegalArgumentException("Unknown object at line: " + ctx.getText());
             }
         }
         super.enterAtom(ctx);
@@ -530,7 +631,7 @@ public class PythonTranslator extends PythonBaseListener {
             return;
         }
         if (ctx.integral() != null) {
-            currentType = "int";
+            currentType = checkFloatToInt("int");
             return;
         }
         if (ctx.string() != null) {
@@ -538,6 +639,11 @@ public class PythonTranslator extends PythonBaseListener {
             return;
         }
         super.enterSupport_types(ctx);
+    }
+
+    @Override
+    public void visitErrorNode(ErrorNode node) {
+        throw new IllegalArgumentException("Unexpected symbol: " + node.getText());
     }
 
     @Override

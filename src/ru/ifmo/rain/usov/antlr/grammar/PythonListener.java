@@ -88,6 +88,16 @@ public interface PythonListener extends ParseTreeListener {
 	 */
 	void exitArg(PythonParser.ArgContext ctx);
 	/**
+	 * Enter a parse tree produced by {@link PythonParser#typed_arg}.
+	 * @param ctx the parse tree
+	 */
+	void enterTyped_arg(PythonParser.Typed_argContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link PythonParser#typed_arg}.
+	 * @param ctx the parse tree
+	 */
+	void exitTyped_arg(PythonParser.Typed_argContext ctx);
+	/**
 	 * Enter a parse tree produced by {@link PythonParser#key_arg}.
 	 * @param ctx the parse tree
 	 */

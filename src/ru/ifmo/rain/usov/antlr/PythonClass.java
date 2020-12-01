@@ -11,7 +11,7 @@ public class PythonClass {
     public LinkedList<String> ancestors = new LinkedList<>();
     public LinkedHashMap<String, Argument> fields = new LinkedHashMap<>();
     public LinkedHashMap<String, PythonFunction> methods = new LinkedHashMap<>();
-    public String rangeBasedType;
+    public String containerElementsType;
 
     public PythonClass(String name) {
         this.name = name;
@@ -31,14 +31,16 @@ public class PythonClass {
                 .append("public:").append(System.lineSeparator());
         for (Argument field : fields.values()) {
             field.setMargin(PythonTranslator.INDENT);
-            classBuilder.append(field.toString()).append(";").append(System.lineSeparator());
+            field.declaration = true;
+            classBuilder.append(field).append(";").append(System.lineSeparator());
+            field.declaration = false;
         }
 
         for (PythonFunction method : methods.values()) {
             method.setMargin(PythonTranslator.INDENT);
-            classBuilder.append(System.lineSeparator()).append(method.toString());
+            classBuilder.append(System.lineSeparator()).append(method);
         }
-        classBuilder.append(System.lineSeparator());
+        classBuilder.append(";").append(System.lineSeparator());
         return classBuilder.toString();
     }
 }

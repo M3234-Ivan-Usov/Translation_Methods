@@ -7,6 +7,7 @@ public class Argument {
     public String name;
     public String type;
     public String defaultValue;
+    public boolean declaration;
     private String margin = "";
 
     public Argument(String argumentName) {
@@ -37,7 +38,7 @@ public class Argument {
     public String toString() {
         StringBuilder argumentBuilder = new StringBuilder();
         argumentBuilder.append(margin).append(type);
-        if (!isPrimitive()) {
+        if (!isPrimitive() && !declaration && defaultValue == null) {
             argumentBuilder.append(" &");
         }
         argumentBuilder.append(" ").append(name);

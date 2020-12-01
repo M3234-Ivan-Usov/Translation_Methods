@@ -14,8 +14,8 @@ public class PythonFunction {
     public boolean va = false;
 
     public LinkedList<Argument> args = new LinkedList<>();
-    public Map<String, String> localVariables = new HashMap<>();
-    public Map<String, PythonClass> localObjects = new HashMap<>();
+    public Map<String, String> primitives = new HashMap<>();
+    public Map<String, PythonClass> references = new HashMap<>();
     public StringBuilder body = new StringBuilder();
     private String margin = "";
 
@@ -53,7 +53,7 @@ public class PythonFunction {
         if (!args.isEmpty()) {
             functionBuilder.append(args.get(0).toString());
             for (int arg = 1; arg < args.size(); ++arg) {
-                functionBuilder.append(", ").append(args.get(arg).toString());
+                functionBuilder.append(", ").append(args.get(arg));
             }
         }
         functionBuilder.append(")").append(body).append(System.lineSeparator());

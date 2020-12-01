@@ -25,7 +25,8 @@ single_line : (assignment | update | ret | 'break' | 'continue' | 'pass' | impor
 function: func_def ':' func_body ;
 func_def : 'def' NAME func_params ;
 func_params : '(' arg? (',' arg)* ')';
-arg: key_arg | simple_arg ;
+arg: typed_arg | key_arg | simple_arg ;
+typed_arg: NAME ':' NAME ;
 key_arg : NAME '=' (support_types | func_call) ;
 simple_arg : NAME ;
 func_body : block ;
@@ -85,7 +86,7 @@ bool : 'True' | 'False' ;
 none : 'None' ;
 floating : '-'? INT '.' INT;
 integral : '-'? INT ;
-string : '"' ( . | '\\')*? '"' ;
+string : '"' (.)*? '"' ;
 
 UPDATE : ('+=' | '-=' | '*=' | '/=') ;
 COMPARE : ('==' | '!=' | '<' | '<=' | '>' | '>=') ;
