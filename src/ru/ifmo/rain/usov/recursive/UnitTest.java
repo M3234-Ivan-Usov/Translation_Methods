@@ -1,13 +1,29 @@
 package ru.ifmo.rain.usov.recursive;
 
+import edu.uci.ics.jung.algorithms.layout.Layout;
+import edu.uci.ics.jung.algorithms.layout.TreeLayout;
+import edu.uci.ics.jung.graph.DelegateTree;
+import edu.uci.ics.jung.graph.DirectedOrderedSparseMultigraph;
+import edu.uci.ics.jung.visualization.BasicVisualizationServer;
+import edu.uci.ics.jung.visualization.decorators.ToStringLabeller;
+import edu.uci.ics.jung.visualization.renderers.Renderer;
 import org.junit.Test;
-import static org.junit.Assert.*;
+import org.junit.runner.JUnitCore;
+import org.junit.runner.Result;
+import org.junit.runner.notification.Failure;
 
+import javax.swing.*;
 import java.text.ParseException;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
 public class UnitTest {
     private static SyntaxAnalyser syntaxAnalyser = new SyntaxAnalyser();
+    private static Set<JFrame> windows = new HashSet<>();
 
     /**
      *    Expected:
@@ -38,6 +54,8 @@ public class UnitTest {
         assertEquals("and", rightLeft.lexeme);
         assertEquals("b", rightLeft.children.get(0).lexeme);
         assertEquals("c", rightLeft.children.get(1).lexeme);
+
+        plotTree(root, expression);
     }
 
     /**
@@ -70,6 +88,8 @@ public class UnitTest {
         assertEquals("not", doubleNot.lexeme);
         assertEquals("not", doubleNot.children.get(0).lexeme);
         assertEquals("c", doubleNot.children.get(0).children.get(0).lexeme);
+
+        plotTree(root, expression);
     }
 
     /**
@@ -99,6 +119,8 @@ public class UnitTest {
         assertEquals("or", leftRight.lexeme);
         assertEquals("b", leftRight.children.get(0).lexeme);
         assertEquals("c", leftRight.children.get(1).lexeme);
+
+        plotTree(root, expression);
     }
 
     @Test(expected = ParseException.class)
@@ -156,4 +178,33 @@ public class UnitTest {
     public void test13_empty() throws ParseException {
         syntaxAnalyser.parse("a or ()");
     }
+
+    private void plotTree(Node root, String expression) {
+        DelegateTree<String, String> tree = new DelegateTree<>(new DirectedOrderedSparseMultigraph<>());
+        int counter = 0;
+        String rootName = counter + ": " + root.lexeme;
+        tree.setRoot(rootName);
+        for (Node next: root.children) { counter = next.plotSubtree(tree, rootName, counter + 1); }
+        Layout<String, String> layout = new TreeLayout<>(tree);
+        BasicVisualizationServer<String, String> view = new BasicVisualizationServer<>(layout);
+        view.getRenderer().getVertexLabelRenderer().setPosition(Renderer.VertexLabel.Position.N);
+        view.getRenderContext().setVertexLabelTransformer(new ToStringLabeller<>());
+        JFrame frame = new JFrame(expression);
+        frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        frame.getContentPane().add(view);
+        frame.pack();
+        windows.add(frame);
+    }
+
+    public static void main(String[] args) {
+        JUnitCore junit = new JUnitCore();
+        Result result = junit.run(UnitTest.class);
+        if (result.wasSuccessful()) { System.out.println("===== SUCCESSFUL ====="); }
+        for (Failure failure : result.getFailures()) {
+            System.out.println(failure.getDescription().getMethodName() + ":");
+            System.out.println(failure.getMessage());
+        }
+        for (JFrame window : windows) { window.setVisible(true); }
+    }
+
 }

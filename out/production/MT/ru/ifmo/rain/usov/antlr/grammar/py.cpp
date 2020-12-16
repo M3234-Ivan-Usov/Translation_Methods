@@ -54,7 +54,7 @@ bool global_func(TestClass & x, bool z = true) {
 int main(int argc, char** argv) {
     float x = 0.0;
     while (true) {
-        std::cout << x << pow("hello".<< 2), std::endl;
+        std::cout << x << pow(x, 2) << std::endl;
         x += pow(x, 2);
         if (x >= 100) {
             break;
