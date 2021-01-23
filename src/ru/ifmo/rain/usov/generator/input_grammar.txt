@@ -1,0 +1,10 @@
+grammar calc;
+
+expr -> expr '+' term;
+expr -> term;
+
+term -> term '*' factor;
+term -> factor;
+
+factor -> \d+ ('.' \d+)?;
+factor -> '(' expr ')';
