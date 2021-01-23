@@ -68,8 +68,4 @@ public class LexicalAnalyser {
         }
         return new String(expression, oldPosition, lexemeLength);
     }
-
-
-
-
 }

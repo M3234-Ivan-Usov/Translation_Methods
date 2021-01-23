@@ -55,7 +55,7 @@ public class UnitTest {
         assertEquals("b", rightLeft.children.get(0).lexeme);
         assertEquals("c", rightLeft.children.get(1).lexeme);
 
-        plotTree(root, expression);
+        windows.add(plotTree(root, expression));
     }
 
     /**
@@ -89,7 +89,7 @@ public class UnitTest {
         assertEquals("not", doubleNot.children.get(0).lexeme);
         assertEquals("c", doubleNot.children.get(0).children.get(0).lexeme);
 
-        plotTree(root, expression);
+        windows.add(plotTree(root, expression));
     }
 
     /**
@@ -120,7 +120,7 @@ public class UnitTest {
         assertEquals("b", leftRight.children.get(0).lexeme);
         assertEquals("c", leftRight.children.get(1).lexeme);
 
-        plotTree(root, expression);
+        windows.add(plotTree(root, expression));
     }
 
     @Test(expected = ParseException.class)
@@ -139,6 +139,12 @@ public class UnitTest {
     public void test06_syntax() throws ParseException {
         String expression = "a or b not and c";
         syntaxAnalyser.parse(expression);
+    }
+
+    @Test
+    public void t( ) throws ParseException {
+        String x = " not not a";
+        syntaxAnalyser.parse(x);
     }
 
     @Test(expected = ParseException.class)
@@ -179,7 +185,7 @@ public class UnitTest {
         syntaxAnalyser.parse("a or ()");
     }
 
-    private void plotTree(Node root, String expression) {
+    protected static JFrame plotTree(Node root, String expression) {
         DelegateTree<String, String> tree = new DelegateTree<>(new DirectedOrderedSparseMultigraph<>());
         int counter = 0;
         String rootName = counter + ": " + root.lexeme;
@@ -193,7 +199,7 @@ public class UnitTest {
         frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         frame.getContentPane().add(view);
         frame.pack();
-        windows.add(frame);
+        return frame;
     }
 
     public static void main(String[] args) {
@@ -206,5 +212,4 @@ public class UnitTest {
         }
         for (JFrame window : windows) { window.setVisible(true); }
     }
-
 }

@@ -2,6 +2,7 @@ package ru.ifmo.rain.usov.recursive;
 
 import edu.uci.ics.jung.graph.DelegateTree;
 
+import java.text.ParseException;
 import java.util.Arrays;
 import java.util.LinkedList;
 
@@ -24,5 +25,16 @@ public class Node {
         graph.addChild(edgeId, parent, vertexId);
         for (Node next : children) { uniqueCounter = next.plotSubtree(graph, vertexId, uniqueCounter + 1); }
         return uniqueCounter;
+    }
+
+    public static void main(String[] args) {
+        String expression = "not (not a)";
+        SyntaxAnalyser syntaxAnalyser = new SyntaxAnalyser();
+        try {
+            Node root = syntaxAnalyser.parse(expression);
+            UnitTest.plotTree(root, expression).setVisible(true);
+        } catch (ParseException e) {
+            System.out.println("Syntax error in expression: " + expression);
+        }
     }
 }
