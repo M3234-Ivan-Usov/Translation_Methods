@@ -2,79 +2,42 @@ package ru.ifmo.rain.usov.generator.calc;
 
 import java.util.*;
 
-public class CalcGrammar {
-    public List<Product> products;
-    public EnumMap<Token, Set<Product>> entries;
+import ru.ifmo.rain.usov.generator.grammar_base.*;
 
-    public EnumSet<Token> terminals;
-    public EnumSet<Token> nonterminals;
-
-    public EnumMap<Token, EnumSet<Token>> first;
-    public EnumMap<Token, EnumSet<Token>> follow;
-
-    private void initProducts() {
-		create(new Product(Token.AUGMENT, Token.expr));
-		create(new Product(Token.expr, Token.expr, Token.TERM_4, Token.term));
-		create(new Product(Token.expr, Token.term));
-		create(new Product(Token.term, Token.term, Token.TERM_3, Token.factor));
-		create(new Product(Token.term, Token.factor));
-		create(new Product(Token.factor, Token.TERM_0));
-		create(new Product(Token.factor, Token.TERM_2, Token.expr, Token.TERM_1));
+public class CalcGrammar extends Grammar<CalcItem, CalcAttribute> {
+	public CalcGrammar() {
+		super(
+			Set.of(CalcItem.TERM_0, CalcItem.TERM_4, CalcItem.TERM_2, 
+			CalcItem.TERM_1, CalcItem.TERM_3),
+			Set.of(CalcItem.augment, CalcItem.expr, CalcItem.factor, 
+			CalcItem.term)
+		);
+		this.initProducts();
+		this.findFirst();
 	}
 
-    public CalcGrammar() {
-        this.terminals = EnumSet.of(
-			Token.TERM_4, Token.TERM_3, Token.TERM_1, 
-			Token.TERM_2, Token.TERM_0, 
-			Token.EPS, Token.END_GRAMMAR
-		);
-        this.nonterminals = EnumSet.complementOf(terminals);
-
-        this.entries = new EnumMap<>(Token.class);
-        this.first = new EnumMap<>(Token.class);
-        this.follow = new EnumMap<>(Token.class);
-
-        for(Token nonterm : nonterminals) {
-            entries.put(nonterm, new HashSet<>());
-            first.put(nonterm, EnumSet.noneOf(Token.class));
-            follow.put(nonterm, EnumSet.noneOf(Token.class));
-        }
-
-        this.products = new ArrayList<>();
-        this.initProducts();
-
-        for (Token term : terminals) { first.put(term, EnumSet.of(term)); }
-        this.findFirst();
-    }
-
-    private void create(Product product) {
-        products.add(product);
-        entries.get(product.left).add(product);
-    }
-
-    protected void findFirst() {
-        boolean update = true;
-        while (update) {
-            update = false;
-            for (Product product : products) {
-                Token next = product.right.get(0);
-                if (first.get(product.left).addAll(first.get(next))) { update = true; }
-            }
-        }
-    }
-
-    protected void findFollow() {
-        boolean update = true;
-        while (update) {
-            update = false;
-            for (Product product : products) {
-                List<Token> right = product.right;
-
-                for (int index = 0; index < right.size() - 1; ++index) {
-                    if (terminals.contains(right.get(index))) { continue; }
-
-                }
-            }
-        }
-    }
+	@Override
+	protected void initProducts() {
+		create(new Product<>(CalcItem.augment, CalcItem.expr), p -> {
+			p.left = p.right[0];
+		});
+		create(new Product<>(CalcItem.expr, CalcItem.expr, CalcItem.TERM_0, CalcItem.term), p -> {
+			p.left.val = p.right[0].val + p.right[2].val;
+		});
+		create(new Product<>(CalcItem.expr, CalcItem.term), p -> {
+			p.left.val = p.right[0].val;
+		});
+		create(new Product<>(CalcItem.term, CalcItem.term, CalcItem.TERM_1, CalcItem.factor), p -> {
+			p.left.val = p.right[0].val * p.right[2].val;
+		});
+		create(new Product<>(CalcItem.term, CalcItem.factor), p -> {
+			p.left.val = p.right[0].val;
+		});
+		create(new Product<>(CalcItem.factor, CalcItem.TERM_2), p -> {
+			p.left.val = Double.parseDouble(p.right[0].string);
+		});
+		create(new Product<>(CalcItem.factor, CalcItem.TERM_3, CalcItem.expr, CalcItem.TERM_4), p -> {
+			p.left.val = p.right[1].val;
+		});
+	}
 }

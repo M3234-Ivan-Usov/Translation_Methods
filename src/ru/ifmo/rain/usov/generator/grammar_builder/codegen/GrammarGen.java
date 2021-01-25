@@ -1,116 +1,84 @@
 package ru.ifmo.rain.usov.generator.grammar_builder.codegen;
 
-import ru.ifmo.rain.usov.generator.grammar_builder.grammar_stuff.GrammarItem;
-import ru.ifmo.rain.usov.generator.grammar_builder.grammar_stuff.GrammarProduct;
-import ru.ifmo.rain.usov.generator.grammar_builder.grammar_stuff.GrammarUnit;
+import ru.ifmo.rain.usov.generator.grammar_builder.builder_stuff.GrammarProduct;
+import ru.ifmo.rain.usov.generator.grammar_builder.builder_stuff.GrammarRegex;
+import ru.ifmo.rain.usov.generator.grammar_builder.builder_stuff.GrammarUnit;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class GrammarGen {
-    static int IN_ROW = 3;
+    static int IN_ROW = 4;
     static String line = System.lineSeparator();
 
-    static String template = "package @@@;\n" +
-            "\n" +
-            "import java.util.*;\n" +
-            "\n" +
-            "public class ###Grammar {\n" +
-            "    public List<Product> products;\n" +
-            "    public EnumMap<Token, Set<Product>> entries;\n" +
-            "\n" +
-            "    public EnumSet<Token> terminals;\n" +
-            "    public EnumSet<Token> nonterminals;\n" +
-            "\n" +
-            "    public EnumMap<Token, EnumSet<Token>> first;\n" +
-            "    public EnumMap<Token, EnumSet<Token>> follow;\n" +
-            "\n" +
-            "    private void initProducts() {%%%}\n" +
-            "\n" +
-            "    public ###Grammar() {\n" +
-            "        this.terminals = EnumSet.of(&&&);\n" +
-            "        this.nonterminals = EnumSet.complementOf(terminals);\n" +
-            "\n" +
-            "        this.entries = new EnumMap<>(Token.class);\n" +
-            "        this.first = new EnumMap<>(Token.class);\n" +
-            "        this.follow = new EnumMap<>(Token.class);\n" +
-            "\n" +
-            "        for(Token nonterm : nonterminals) {\n" +
-            "            entries.put(nonterm, new HashSet<>());\n" +
-            "            first.put(nonterm, EnumSet.noneOf(Token.class));\n" +
-            "            follow.put(nonterm, EnumSet.noneOf(Token.class));\n" +
-            "        }\n" +
-            "\n" +
-            "        this.products = new ArrayList<>();\n" +
-            "        this.initProducts();\n" +
-            "\n" +
-            "        for (Token term : terminals) { first.put(term, EnumSet.of(term)); }\n" +
-            "        this.findFirst();\n" +
-            "    }\n" +
-            "\n" +
-            "    private void create(Product product) {\n" +
-            "        products.add(product);\n" +
-            "        entries.get(product.left).add(product);\n" +
-            "    }\n" +
-            "\n" +
-            "    protected void findFirst() {\n" +
-            "        boolean update = true;\n" +
-            "        while (update) {\n" +
-            "            update = false;\n" +
-            "            for (Product product : products) {\n" +
-            "                Token next = product.right.get(0);\n" +
-            "                if (first.get(product.left).addAll(first.get(next))) { update = true; }\n" +
-            "            }\n" +
-            "        }\n" +
-            "    }\n" +
-            "\n" +
-            "    protected void findFollow() {\n" +
-            "        boolean update = true;\n" +
-            "        while (update) {\n" +
-            "            update = false;\n" +
-            "            for (Product product : products) {\n" +
-            "                List<Token> right = product.right;\n" +
-            "\n" +
-            "                for (int index = 0; index < right.size() - 1; ++index) {\n" +
-            "                    if (terminals.contains(right.get(index))) { continue; }\n" +
-            "\n" +
-            "                }\n" +
-            "            }\n" +
-            "        }\n" +
-            "    }\n" +
-            "}\n";
+    public static void run(
+            String packageName, String camelName,
+            Path path, Map<GrammarRegex, String> terminalMap,
+            List<GrammarProduct> products, Set<GrammarUnit> units
+    ) throws IOException {
+        StringBuilder grammar = new StringBuilder();
+        grammar.append("package ").append(packageName).append(";").append(line.repeat(2));
+        grammar.append("import java.util.*;").append(line.repeat(2));
+        grammar.append("import ru.ifmo.rain.usov.generator.grammar_base.*;").append(line.repeat(2));
+        grammar.append("public class ").append(camelName).append("Grammar extends Grammar<").append(camelName)
+                .append("Item, ").append(camelName).append("Attribute> {").append(line);
+        grammar.append("\tpublic ").append(camelName).append("Grammar() {").append(line);
+        grammar.append("\t".repeat(2)).append(callSuper(camelName, terminalMap, units));
+        grammar.append("\t".repeat(2)).append("this.initProducts();").append(line);
+        grammar.append("\t".repeat(2)).append("this.findFirst();").append(line);
+        grammar.append("\t}").append(line.repeat(2));
+        grammar.append("\t@Override").append(line);
+        grammar.append("\tprotected void initProducts() {");
+        grammar.append(createRules(camelName, products, terminalMap));
+        grammar.append(line).append("\t}").append(line).append("}");
+        Files.writeString(path, grammar);
 
-    public static void run(String packageName, String camelName, Path path,
-                           Map<String, String> terminalMap, List<GrammarProduct> products) throws IOException {
-        StringBuilder terminals = new StringBuilder();
-        int counter = 0;
-        for (Map.Entry<String, String> pair : terminalMap.entrySet()) {
-            if (counter++ % IN_ROW == 0) { terminals.append(line).append("\t".repeat(3)); }
-            terminals.append("Token.").append(pair.getValue()).append(", ");
+    }
+
+    private static String callSuper(
+            String camelName, Map<GrammarRegex, String> terminalMap,
+            Set<GrammarUnit> units) {
+        StringBuilder call = new StringBuilder();
+        call.append("super(").append(line).append("\t".repeat(3)).append("Set.of(");
+        int counter = 1;
+        for (Map.Entry<GrammarRegex, String> pair : terminalMap.entrySet()) {
+            if (counter++ % IN_ROW == 0) { call.append(line).append("\t".repeat(3)); }
+            call.append(camelName).append("Item.").append(pair.getValue()).append(", ");
         }
-        terminals.append(line).append("\t".repeat(3))
-                .append("Token.EPS, Token.END_GRAMMAR").append(line).append("\t".repeat(2));
+        int lastIndex = call.length() - 2;
+        call.replace(lastIndex, call.length(), "),").append(line).append("\t".repeat(3)).append("Set.of(");
+        counter = 1;
+        for (GrammarUnit unit: units) {
+            if (unit.terminal) { continue; }
+            if (counter++ % IN_ROW == 0) { call.append(line).append("\t".repeat(3)); }
+            call.append(camelName).append("Item.").append(unit.value).append(", ");
+        }
+        lastIndex = call.length() - 2;
+        call.replace(lastIndex, call.length(), ")");
+        call.append(line).append("\t".repeat(2)).append(");").append(line);
+        return call.toString();
+    }
 
-        StringBuilder rules = new StringBuilder(line + "\t".repeat(2));
-        rules.append("create(new Product(Token.AUGMENT, Token.").append(products.get(0).left.value).append("));");
+    private static String createRules(
+            String camelName, List<GrammarProduct> products,
+            Map<GrammarRegex, String> terminalMap) {
+        StringBuilder rules = new StringBuilder();
         for (GrammarProduct rule : products) {
-            rules.append(line).append("\t".repeat(2)).append("create(new Product(Token.").append(rule.left.value);
+            rules.append(line).append("\t".repeat(2)).append("create(new Product<>(")
+                    .append(camelName).append("Item.").append(rule.left.value);
             for (GrammarUnit unit : rule.right) {
                 String tokenName = unit.value;
-                if (unit.terminal) { tokenName = terminalMap.get(unit.regexTerminal.regex); }
-                rules.append(", Token.").append(tokenName);
+                if (unit.terminal) { tokenName = terminalMap.get(unit.regexTerminal); }
+                rules.append(", ").append(camelName).append("Item.").append(tokenName);
             }
-            rules.append("));");
+            rules.append("), p -> {");
+            for (String action : rule.actions) { rules.append(line).append("\t".repeat(3)).append(action); }
+            rules.append(line).append("\t".repeat(2)).append("});");
         }
-        rules.append(line).append("\t");
-        String source = template;
-        source = source.replace("@@@", packageName);
-        source = source.replace("###", camelName);
-        source = source.replace("&&&", terminals);
-        source = source.replace("%%%", rules);
-        Files.writeString(path, source);
+        return rules.toString();
     }
 }
