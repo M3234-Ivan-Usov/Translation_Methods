@@ -12,7 +12,7 @@ import ru.ifmo.rain.usov.generator.grammar_base.*;
 import ru.ifmo.rain.usov.generator.grammar_base.lexer.LexerDFA;
 import ru.ifmo.rain.usov.generator.grammar_base.lexer.LexerNDFA;
 import ru.ifmo.rain.usov.generator.grammar_base.regex.Terminal;
-import ru.ifmo.rain.usov.generator.lr_parser.LRAutomaton;
+import ru.ifmo.rain.usov.generator.lr_parser.*;
 import ru.ifmo.rain.usov.recursive.Token;
 
 import javax.swing.*;
@@ -22,6 +22,8 @@ import java.util.Set;
 import java.util.Stack;
 
 public class Visual {
+    public static Dimension size = new Dimension(1000, 800);
+
     private static class TokenInstance<T extends Enum<T>> {
         private final String string;
         private boolean leaf;
@@ -155,8 +157,9 @@ public class Visual {
     }
 
     private static <V, E> void plot(DirectedSparseMultigraph<V, E> graph, Label<V, E> param) {
-        Layout<V, E> layout = new KKLayout<>(graph);
+        Layout<V, E> layout = new KKLayout<>(graph); layout.setSize(size);
         BasicVisualizationServer<V, E> view = new BasicVisualizationServer<>(layout);
+        view.setSize(size); view.setPreferredSize(size);
         view.getRenderer().getVertexLabelRenderer().setPosition(Renderer.VertexLabel.Position.AUTO);
         view.getRenderContext().setVertexLabelTransformer(param.vertexLabel);
         view.getRenderContext().setEdgeLabelTransformer(param.edgeLabel);
@@ -168,10 +171,29 @@ public class Visual {
         frame.setVisible(true);
     }
 
+    public static <T extends Enum<T>, A extends Attributable<T>> void actionTable(LRParser<T, A> parser) {
+        System.out.println("\tTABLE");
+        for (LRAutomaton.LRState<T, A> state : parser.automaton.canonicalCollection.keySet()) {
+            System.out.println("--- " + state.id + " ---");
+            for (LRItem<T, A> item: state.items.keySet()) { System.out.println(item); }
+            System.out.println();
+            for (Map.Entry<T, LRAction> action: state.action.entrySet()) {
+                if (action.getValue() instanceof ActionReduce<?, ?>) {
+                    System.out.println("Reduce " + ((ActionReduce<?, ?>)
+                            action.getValue()).product + " by " + action.getKey());
+                }
+                else { System.out.println("Shift to " + state.move.
+                        get(action.getKey()).id + " by " + action.getKey());
+                }
+            }
+            System.out.println();
+        }
+    }
+
     public static <T extends Enum<T>> void tree(Attributable<T> root) {
         DelegateTree<TokenInstance<T>, TokenInstance<T>> tree =
                 new DelegateTree<>(new DirectedOrderedSparseMultigraph<>());
-        TokenInstance<T> adaptedRoot = new TokenInstance<T>(root);
+        TokenInstance<T> adaptedRoot = new TokenInstance<>(root);
         tree.setRoot(adaptedRoot);
         Stack<Map.Entry<Attributable<T>, TokenInstance<T>>> treeDfs = new Stack<>();
         treeDfs.push(Map.entry(root, adaptedRoot));
@@ -179,7 +201,7 @@ public class Visual {
             Map.Entry<Attributable<T>, TokenInstance<T>> subRoot = treeDfs.pop();
             if (subRoot.getKey().string == null) {
                 for (Attributable<T> child : subRoot.getKey().tree.right) {
-                    TokenInstance<T> adaptedChild = new TokenInstance<T>(child);
+                    TokenInstance<T> adaptedChild = new TokenInstance<>(child);
                     tree.addChild(new TokenInstance<>(child.token), subRoot.getValue(), adaptedChild);
                     treeDfs.push(Map.entry(child, adaptedChild));
                 }

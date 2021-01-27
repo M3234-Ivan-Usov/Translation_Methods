@@ -4,24 +4,23 @@ import ru.ifmo.rain.usov.generator.grammar_base.Attributable;
 import ru.ifmo.rain.usov.generator.grammar_base.Product;
 import ru.ifmo.rain.usov.generator.grammar_base.RuntimeProduct;
 
-import java.util.Map;
 import java.util.Objects;
 
 public class ActionReduce<T extends Enum<T>, A extends Attributable<T>> implements LRAction {
-    public final RuntimeProduct<T, A> runtimeProduct;
+    public RuntimeProduct<T, A> runtimeProduct;
     public final Product<T, A> product;
-    public boolean accept = false;
     private final LRParser<T, A> parser;
+    public boolean accept = false;
 
 
     public ActionReduce(Product<T, A> product, LRParser<T, A> parser) {
-        this.runtimeProduct = new RuntimeProduct<>(product, parser.lexer.makeInstance(product.left));
-        this.runtimeProduct.left.tree = runtimeProduct;
         this.parser = parser; this.product = product;
     }
 
     @Override
     public void perform() {
+        this.runtimeProduct = new RuntimeProduct<>(product, parser.lexer.makeInstance(product.left));
+        this.runtimeProduct.left.tree = runtimeProduct;
         for (int i = runtimeProduct.last; i >= 0; --i) {
             runtimeProduct.right.set(i, parser.viablePrefix.pop());
             parser.states.pop();
@@ -42,7 +41,5 @@ public class ActionReduce<T extends Enum<T>, A extends Attributable<T>> implemen
     }
 
     @Override
-    public int hashCode() {
-        return Objects.hash(runtimeProduct, product, parser);
-    }
+    public int hashCode() { return Objects.hash(product); }
 }
