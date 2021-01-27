@@ -17,7 +17,7 @@ public class TokenGen {
 
     public static Map<GrammarRegex, String> run(
             Set<GrammarUnit> units, String packageName,
-            String camelName, Path path) throws IOException {
+            String camelName, Set<GrammarRegex> skippers, Path path) throws IOException {
         Map<GrammarRegex, String> terminalMap = new HashMap<>();
         StringBuilder enums = new StringBuilder();
         enums.append("package ").append(packageName).append(";").append(line.repeat(2));
@@ -39,9 +39,10 @@ public class TokenGen {
         enums.append("\t").append("public String toString() {").append(line);
         enums.append("\t".repeat(2)).append("switch (this) {").append(line);
         for (Map.Entry<GrammarRegex, String> pair : terminalMap.entrySet()) {
-            enums.append("\t".repeat(3)).append("case ").append(pair.getValue()).append(": ");
-            enums.append("return \"").append(pair.getKey().regex
-                    .replace("\\", "\\\\")).append("\";").append(line);
+            enums.append("\t".repeat(3)).append("case ").append(pair.getValue()).append(": return \"");
+            if (skippers.contains(pair.getKey())) { enums.append("skip\";").append(line); }
+            else { enums.append(pair.getKey().regex
+                    .replace("\\", "\\\\")).append("\";").append(line); }
         }
         enums.append("\t".repeat(3)).append("default: return this.name();").append(line);
         enums.append("\t".repeat(2)).append("}").append(line);

@@ -3,14 +3,16 @@ package ru.ifmo.rain.usov.generator.lr_parser;
 import ru.ifmo.rain.usov.generator.grammar_base.Attributable;
 import ru.ifmo.rain.usov.generator.grammar_base.lexer.Lexer;
 
+import java.text.ParseException;
 import java.util.*;
 
 public class LRParser<Token extends Enum<Token>, Attribute extends Attributable<Token>> {
-    public Stack<Map.Entry<LRAutomaton.LRState<Token, Attribute>, Attributable<Token>>> prefix;
+    protected Stack<LRAutomaton.LRState<Token, Attribute>> states;
+    protected Stack<Attribute> viablePrefix;
     public final LRAutomaton<Token, Attribute> automaton;
     public final Lexer<Token, Attribute> lexer;
-    public Deque<Attribute> input;
-    public boolean accepted;
+    protected Deque<Attribute> input;
+    protected boolean accepted;
 
 
     public LRParser(LRAutomaton<Token, Attribute> automaton, Lexer<Token, Attribute> lexer) {
@@ -18,38 +20,56 @@ public class LRParser<Token extends Enum<Token>, Attribute extends Attributable<
         this.lexer = lexer;
         LRItem<Token, Attribute> terminator = new LRItem<>(automaton.grammar.products.get(0),
                 1, null, automaton.grammar);
-        for (LRAutomaton.LRState<Token, Attribute> state : automaton.canonicalCollection) {
+        for (LRAutomaton.LRState<Token, Attribute> state : automaton.canonicalCollection.values()) {
             for (LRItem<Token, Attribute> item : state.items) {
-/*
-                if (!item.terminator) {
+                if (!item.terminator && item.nextTerminal) {
                     LRAutomaton.LRState<Token, Attribute> next = state.move.get(item.next);
-                    state.action.put(item.next, () -> prefix.push(Map.entry(next, input.removeFirst()))
-                    );
+                    LRAction prev = state.action.put(item.next, () -> {
+                        states.push(next); viablePrefix.push(input.pollFirst());
+                    });
+                    if (prev instanceof ActionReduce) { throw new RuntimeException(
+                            "Shift-Reduce conflict appears on state " + state.id + " via " + item.next); }
                 }
-                else if (item.equals(terminator)) { state.action.put(item.lookAhead, () -> accepted = true); }
-                else  { state.action.put(item.lookAhead, () -> {
-                    for (int i = 0; i < item.product.right.size(); ++i) { prefix.pop(); }
-                    LRAutomaton.LRState<Token, Attribute> next = prefix.peek().getKey().move.get(item.product.left);
-                    //prefix.push(Map.entry(next, item.product.left));
-                }); }*/
+                else if (item.terminator) {
+                    ActionReduce<Token, Attribute> reduce = new ActionReduce<>(item.product, this);
+                    if (item.equals(terminator)) { reduce.accept = true; }
+                    LRAction prev = state.action.put(item.lookAhead, reduce);
+                    if (prev != null) { checkConflict(prev, reduce, state, item); }
+                }
             }
         }
     }
 
-   /* private Attribute makeAttributable(Token token) {
-    }*/
-    public void parse(String input) {
-        this.input = new ArrayDeque<>();
-        lexer.load(input);
-        do { this.input.offerLast(lexer.nextToken()); }
-        while (lexer.position != lexer.length);
-        prefix.push(Map.entry(automaton.initial, null));
-        accepted = false;
-        while(!accepted) {
-            Attribute lookAhead = this.input.peek();
-            LRAutomaton.LRState<Token, Attribute> current = prefix.peek().getKey();
-            current.action.get(lookAhead).perform();
-        }
+    private void checkConflict(LRAction prev, ActionReduce<Token, Attribute> reduce,
+                               LRAutomaton.LRState<Token, Attribute> state, LRItem<Token, Attribute> item) {
+        if (!(prev instanceof ActionReduce)) { throw new RuntimeException(
+                "Shift-Reduce conflict appears on state " + state.id + " via " + item.next); }
+        else if (!reduce.equals(prev)) { throw new RuntimeException(
+                "Reduce-Reduce conflict appears on state " + state.id + " via " + item.next +
+                        ". Both " + System.lineSeparator() + ((ActionReduce<?, ?>) prev).product +
+                        System.lineSeparator() + reduce.product + System.lineSeparator() + " available"); }
     }
 
+    public Attribute parse(String input) throws ParseException {
+        this.input = new ArrayDeque<>();
+        this.states = new Stack<>();
+        this.viablePrefix = new Stack<>();
+        lexer.load(input);
+        do {
+            Attribute next = lexer.nextToken();
+            if (next == null) { throw new ParseException("Unexpected char: '"
+                    + lexer.input[lexer.position] + "' (" + lexer.position + ")", lexer.position); }
+            this.input.offerLast(next);
+        }
+        while (lexer.position != lexer.length);
+        this.input.offerLast(lexer.makeInstance(null));
+        this.states.push(automaton.initial);
+        accepted = false;
+        while(!accepted) {
+            Attribute lookAhead = this.input.peekFirst();
+            LRAutomaton.LRState<Token, Attribute> current = states.peek();
+            current.action.get(lookAhead.token).perform();
+        }
+        return viablePrefix.pop();
+    }
 }

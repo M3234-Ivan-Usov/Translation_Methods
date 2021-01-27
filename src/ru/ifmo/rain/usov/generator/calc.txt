@@ -5,11 +5,15 @@ grammar calc;
 
 expr -> expr '+' term;
 @attr { @it.val = @0.val + @2.val; }
+expr -> expr '-' term;
+@attr { @it.val = @0.val - @2.val; }
 expr -> term;
 @attr { @it.val = @0.val; }
 
 term -> term '*' factor;
 @attr { @it.val = @0.val * @2.val; }
+term -> term '/' factor;
+@attr { @it.val = @0.val / @2.val; }
 term -> factor;
 @attr { @it.val = @0.val; }
 
@@ -17,3 +21,5 @@ factor -> \d+ ('.' \d+)?;
 @attr { @it.val = Double.parseDouble(@0.string); }
 factor -> '(' expr ')';
 @attr { @it.val = @1.val; }
+
+skip -> ' '+;

@@ -30,6 +30,7 @@ public class GrammarGen {
         grammar.append("\t".repeat(2)).append(callSuper(camelName, terminalMap, units));
         grammar.append("\t".repeat(2)).append("this.initProducts();").append(line);
         grammar.append("\t".repeat(2)).append("this.findFirst();").append(line);
+        grammar.append("\t".repeat(2)).append("this.findFollow();").append(line);
         grammar.append("\t}").append(line.repeat(2));
         grammar.append("\t@Override").append(line);
         grammar.append("\tprotected void initProducts() {");

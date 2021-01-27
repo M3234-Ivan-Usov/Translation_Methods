@@ -17,7 +17,6 @@ public class TestGenerator {
             Path inputGrammar = Path.of(args[0]);
             String rawGrammar = Files.readString(inputGrammar);
             Builder builder = new Builder(rawGrammar);
-            System.out.println("DEBUG");
             builder.generate(inputGrammar.getParent(), args[1]);
         }
         catch (ParseException e) { System.out.println("Parsing error: " + e.getMessage()); }

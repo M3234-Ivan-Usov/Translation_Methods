@@ -1,0 +1,33 @@
+grammar bool;
+
+@def { boolean val; }
+@start or
+
+or -> or 'or' xor;
+@attr { @it.val = @0.val || @2.val; }
+or -> xor;
+@attr { @it.val = @0.val; }
+
+xor -> xor 'xor' and;
+@attr { @it.val = @0.val ^ @2.val; }
+xor -> and;
+@attr { @it.val = @0.val; }
+
+and -> and 'and' not;
+@attr { @it.val = @0.val && @2.val; }
+and -> not;
+@attr { @it.val = @0.val; }
+
+not -> 'not' not;
+@attr { @it.val = !@1.val; }
+not -> val;
+@attr { @it.val = @0.val; }
+
+val -> '(' or ')';
+@attr { @it.val = @1.val; }
+val -> 'true';
+@attr { @it.val = true; }
+val -> 'false';
+@attr { @it.val = false; }
+
+skip -> ' '+ | \n+;

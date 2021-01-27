@@ -17,7 +17,7 @@ public class GrammarProduct {
     public void newAction(String action) {
         String adapted = action.strip().replace("@it", "p.left");
         for (int index = 0; index < right.size(); ++index) {
-            adapted = adapted.replace("@" + index, "p.right[" + index + "]");
+            adapted = adapted.replace("@" + index, "p.right.get(" + index + ")");
         }
         actions.add(adapted);
     }

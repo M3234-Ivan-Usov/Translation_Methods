@@ -21,10 +21,17 @@ public class Product<Token extends Enum<Token>, Attribute extends Attributable<T
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        Product product = (Product) o;
+        Product<?, ?> product = (Product<?, ?>) o;
         return left == product.left && Objects.equals(right, product.right) && epsilon == product.epsilon;
     }
 
     @Override
     public int hashCode() { return Objects.hash(left, right, epsilon); }
+
+    @Override
+    public String toString() {
+        StringBuilder str = new StringBuilder(left.toString() + " ->");
+        for (Token token : right) { str.append(" ").append(token.toString()); }
+        return str.toString();
+    }
 }

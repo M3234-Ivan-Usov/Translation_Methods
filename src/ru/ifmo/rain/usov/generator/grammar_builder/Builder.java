@@ -54,6 +54,7 @@ import java.util.*;
 public class Builder {
     private GrammarLex lexer;
     private Set<GrammarUnit> units;
+    private Set<GrammarRegex> skippers;
     private List<GrammarProduct> products;
     private Map<GrammarUnit, Set<GrammarProduct>> entries;
     private GrammarProduct currentProduct;
@@ -74,18 +75,21 @@ public class Builder {
         this.units = new HashSet<>();
         this.products = new ArrayList<>();
         this.entries = new HashMap<>();
+        this.skippers = new HashSet<>();
         this.lexer = new GrammarLex(rawGrammar);
         String temp = lexer.readHeader();
         char first = temp.charAt(0);
         this.camelName = Character.toUpperCase(first) + temp.substring(1);
         this.lowerName = Character.toLowerCase(first) + temp.substring(1);
         this.attributes = new ArrayList<>();
+        this.start = null;
         lexer.nextToken(); root();
     }
 
     public void generate(Path parent, String parentPackage) throws IOException {
         GrammarUnit augment = new GrammarUnit("augment");
         GrammarProduct zero = new GrammarProduct(augment);
+        if (start == null) { start = products.get(0).left; }
         zero.right.add(start); zero.newAction("@it = @0;");
         products.add(0, zero);
         units.add(augment); entries.put(augment, Set.of(zero));
@@ -93,7 +97,7 @@ public class Builder {
         if (!Files.exists(workingDir)) { Files.createDirectory(workingDir); }
         String packageName = parentPackage + "." + lowerName;
         Map<GrammarRegex, String> terminalMap = TokenGen.run(
-                units, packageName, camelName, mkFile(camelName + "Item.java"));
+                units, packageName, camelName, skippers, mkFile(camelName + "Item.java"));
         GrammarGen.run(packageName, camelName,
                 mkFile(camelName + "Grammar.java"), terminalMap, products, units);
         AttributeGen.run(packageName, camelName, attributes, mkFile(camelName + "Attribute.java"));
@@ -144,7 +148,7 @@ public class Builder {
     private void start() throws ParseException {
         assert (lexer.token == GrammarItem.START);
         lexer.nextToken();
-        if (lexer.token == GrammarItem.NON_TERM) {
+        if (lexer.token == GrammarItem.NON_TERM && start == null) {
             start = new GrammarUnit(lexer.lexeme);
             if (units.add(start)) { entries.put(start, new HashSet<>()); }
             else { for (GrammarUnit unit : units) { if (start.equals(unit)) { start = unit; break; } } }
@@ -158,6 +162,12 @@ public class Builder {
             currentProduct = new GrammarProduct(left());
             assert (lexer.token == GrammarItem.ARROW);
             lexer.nextToken(); right();
+            if (currentProduct.left.value.equals("skip")) {
+                currentProduct.right.forEach(x -> {
+                    if (x.terminal) { skippers.add(x.regexTerminal); }
+                    else { throw new RuntimeException("Cannot skip nonterminal: " + x.value); }
+                });
+            }
             products.add(currentProduct);
             entries.get(currentProduct.left).add(currentProduct);
         }

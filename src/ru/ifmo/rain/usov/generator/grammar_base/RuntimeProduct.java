@@ -1,27 +1,19 @@
 package ru.ifmo.rain.usov.generator.grammar_base;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class RuntimeProduct<Token extends Enum<Token>, Attribute extends Attributable<Token>> {
-    private Constructor<Attribute> install;
     public Attribute left;
-    public Attribute[] right;
-    public boolean epsilon;
+    public List<Attribute> right;
+    public int last;
     public AttributeAction<Token, Attribute> action;
 
-    public RuntimeProduct(Product<Token, Attribute> origin, Class<Attribute> clazz) {
-        try {
-            this.install = clazz.getDeclaredConstructor();
-            this.left = this.install.newInstance();
-            this.right = (Attribute[]) new Object[origin.right.size()];
-            this.epsilon = origin.epsilon;
-            this.action = origin.action;
-            for (int i = 0; i < origin.right.size(); ++i) {
-                this.right[i] = install.newInstance();
-                this.right[i].token = origin.right.get(i);
-            }
-        } catch (NoSuchMethodException | InstantiationException |
-                IllegalAccessException | InvocationTargetException ignored) {}
+    public RuntimeProduct(Product<Token, Attribute> origin, Attribute left) {
+        this.left = left;
+        this.right = new ArrayList<>();
+        for (int i = 0; i < origin.right.size(); ++i) { this.right.add(null); }
+        this.last = origin.right.size() - 1;
+        this.action = origin.action;
     }
 }

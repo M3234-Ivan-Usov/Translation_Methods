@@ -44,7 +44,7 @@ public class LexerDFA<Token extends Enum<Token>> {
         public boolean equals(Object o) {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
-            DFAState other = (DFAState) o;
+            DFAState<?> other = (DFAState<?>) o;
             return terminator == other.terminator && Objects.equals(equivalent, other.equivalent);
         }
 
