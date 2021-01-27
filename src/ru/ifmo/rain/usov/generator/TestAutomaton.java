@@ -23,17 +23,17 @@ public class TestAutomaton {
         Visual.lexerDFA(z.automaton);
         Visual.lrAutomaton(y);
         LRParser<CalcItem, CalcAttribute> parser = new LRParser<>(y, z);
-        CalcAttribute root = parser.parse("2 - (3 * 5.0) / 2");
+        CalcAttribute root = parser.parse("(|sin(pi/2)| + cos([2.71 + pi]))");
         System.out.println(root.val);
         Visual.tree(root);
-        /*BoolGrammar a = new BoolGrammar();
+       /* BoolGrammar a = new BoolGrammar();
         BoolLexer b = new BoolLexer(BoolAttribute.class);
         LRAutomaton<BoolItem, BoolAttribute> c = new LRAutomaton<>(a);
         LRParser<BoolItem, BoolAttribute> d = new LRParser<>(c, b);
         Visual.grammarSets(a);
         Visual.lexerDFA(b.automaton);
         Visual.lrAutomaton(c);
-        BoolAttribute x = d.parse("true or false and not true xor false");
+        BoolAttribute x = d.parse("not USE xor (LOWERCASE and DIGITS) or GET xor not GOOD");
         Visual.tree(x);*/
     }
 }

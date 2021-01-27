@@ -19,7 +19,21 @@ term -> factor;
 
 factor -> \d+ ('.' \d+)?;
 @attr { @it.val = Double.parseDouble(@0.string); }
+factor -> 'pi';
+@attr { @it.val = Math.PI; }
 factor -> '(' expr ')';
 @attr { @it.val = @1.val; }
 
-skip -> ' '+;
+factor -> 'sin(' expr ')';
+@attr { @it.val = Math.sin(@1.val); }
+
+factor -> 'cos(' expr ')';
+@attr { @it.val = Math.cos(@1.val); }
+
+factor -> '|' expr '|';
+@attr { @it.val = Math.abs(@1.val); }
+
+factor -> '[' expr ']';
+@attr { @it.val = Math.ceil(@1.val); }
+
+skip -> ' ';

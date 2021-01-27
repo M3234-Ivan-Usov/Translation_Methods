@@ -71,7 +71,8 @@ public class LRParser<Token extends Enum<Token>, Attribute extends Attributable<
             LRAction action = current.action.get(lookAhead.token);
             if (action != null) { action.perform(); }
             else { throw new ParseException("ERROR: No action on state " +
-                        states.peek().id + " by " + this.tokenStream.peekFirst().token, 0); }
+                    states.peek().id + " by " + this.tokenStream.peekFirst().token +
+                    " (" + lexer.position +")", 0); }
         }
         return viablePrefix.pop();
     }

@@ -1,33 +1,18 @@
 grammar bool;
 
-@def { boolean val; }
-@start or
+o -> o 'or' x;
+o -> x;
 
-or -> or 'or' xor;
-@attr { @it.val = @0.val || @2.val; }
-or -> xor;
-@attr { @it.val = @0.val; }
+x -> x 'xor' a;
+x -> a;
 
-xor -> xor 'xor' and;
-@attr { @it.val = @0.val ^ @2.val; }
-xor -> and;
-@attr { @it.val = @0.val; }
+a -> a 'and' n;
+a -> n;
 
-and -> and 'and' not;
-@attr { @it.val = @0.val && @2.val; }
-and -> not;
-@attr { @it.val = @0.val; }
+n -> 'not' n;
+n -> v;
 
-not -> 'not' not;
-@attr { @it.val = !@1.val; }
-not -> val;
-@attr { @it.val = @0.val; }
+v -> '(' o ')';
+v -> \u+;
 
-val -> '(' or ')';
-@attr { @it.val = @1.val; }
-val -> 'true';
-@attr { @it.val = true; }
-val -> 'false';
-@attr { @it.val = false; }
-
-skip -> ' '+ | \n+;
+skip -> ' ' | \n;
